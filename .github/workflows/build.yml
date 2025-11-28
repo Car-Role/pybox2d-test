@@ -16,6 +16,11 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
         python-version: ['3.6', '3.8', '3.9', '3.10', '3.11']
+        exclude:
+          - os: ubuntu-latest
+            python-version: '3.6'
+          - os: macos-latest
+            python-version: '3.6'
         # Note: Python 3.12 excluded due to pre-existing segfault issues in pybox2d tests
 
     steps:
@@ -64,6 +69,57 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: wheel-${{ matrix.os }}-py${{ matrix.python-version }}
+        path: dist/*.whl
+
+  build-py36-conda:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Miniconda (Python 3.6)
+      uses: conda-incubator/setup-miniconda@v3
+      with:
+        python-version: 3.6
+        auto-update-conda: true
+        channels: conda-forge
+        activate-environment: py36
+
+    - name: Install dependencies (conda py36)
+      shell: bash -l {0}
+      run: |
+        conda install swig pytest pip setuptools wheel
+
+    - name: Build package (conda py36)
+      shell: bash -l {0}
+      run: python setup.py build
+
+    - name: Install package (conda py36)
+      shell: bash -l {0}
+      run: pip install .
+
+    - name: Test import (conda py36)
+      shell: bash -l {0}
+      run: |
+        python -c "import Box2D; print('Box2D imported successfully (py36)')"
+        python -c "from Box2D import b2Globals; print('b2_velocityThreshold (py36):', b2Globals.b2_velocityThreshold)"
+
+    - name: Run tests (conda py36)
+      shell: bash -l {0}
+      run: pytest -vv --pyargs Box2D.tests
+
+    - name: Build wheel (conda py36)
+      shell: bash -l {0}
+      run: pip wheel . -w dist/ --no-deps
+
+    - name: Upload artifacts (conda py36)
+      uses: actions/upload-artifact@v4
+      with:
+        name: wheel-conda-${{ matrix.os }}-py36
         path: dist/*.whl
 
   release:
